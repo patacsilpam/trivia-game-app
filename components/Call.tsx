@@ -1,88 +1,143 @@
 "use client";
 
+import { useState } from "react";
 import AgoraRTC, {
   AgoraRTCProvider,
+  LocalVideoTrack,
+  RemoteUser,
   useJoin,
   useLocalCameraTrack,
   useLocalMicrophoneTrack,
   usePublish,
   useRTCClient,
+  useRemoteAudioTracks,
   useRemoteUsers,
 } from "agora-rtc-react";
 
-const CallComponent = ({
-  appId,
-  channelName,
-}: {
-  appId: string;
-  channelName: string;
-}) => {
+function Call(props: { appId: string; channelName: string }) {
   const client = useRTCClient(
-    AgoraRTC.createClient({ codec: "vp8", mode: "rtc" })
+    typeof window !== "undefined"
+      ? AgoraRTC.createClient({ codec: "vp8", mode: "rtc" })
+      : null
   );
 
-  // 🔥 Hooks should NOT be inside useEffect
-  const { localMicrophoneTrack } = useLocalMicrophoneTrack();
-  const { localCameraTrack } = useLocalCameraTrack();
-  const remoteUsers = useRemoteUsers();
+  return (
+    <AgoraRTCProvider client={client}>
+      <Videos
+        client={client}
+        channelName={props.channelName}
+        AppID={props.appId}
+      />
+    </AgoraRTCProvider>
+  );
+}
 
-  // ✅ Call hooks at the top level, NOT inside useEffect
+function Videos(props: { client: any; channelName: string; AppID: string }) {
+  const { client, AppID, channelName } = props;
+  const { isLoading: isLoadingMic, localMicrophoneTrack } =
+    useLocalMicrophoneTrack();
+  const { isLoading: isLoadingCam, localCameraTrack } = useLocalCameraTrack();
+  const remoteUsers = useRemoteUsers();
+  const { audioTracks } = useRemoteAudioTracks(remoteUsers);
+  const [cameraOn, setCameraOn] = useState(true);
+  const [speakerOn, setSpeakerOn] = useState(true);
+
+  usePublish([localMicrophoneTrack, localCameraTrack]);
   useJoin({
-    appid: appId,
+    appid: AppID,
     channel: channelName,
     token: null,
   });
 
-  usePublish([localMicrophoneTrack, localCameraTrack]);
+  audioTracks.forEach((track) => track.play());
+
+  if (isLoadingMic || isLoadingCam)
+    return (
+      <div className="flex flex-col items-center pt-40">Loading devices...</div>
+    );
+
+  // ✅ Toggle Camera Function (with valid check)
+  const toggleCamera = () => {
+    if (localCameraTrack) {
+      localCameraTrack.setEnabled(!cameraOn);
+      setCameraOn((prev) => !prev);
+    }
+  };
+
+  // ✅ Toggle Speaker Function (corrected)
+  const toggleSpeaker = async () => {
+    if (localMicrophoneTrack) {
+      if (speakerOn) {
+        await client.unpublish(localMicrophoneTrack);
+        localMicrophoneTrack.setEnabled(false);
+      } else {
+        localMicrophoneTrack.setEnabled(true);
+        await client.publish(localMicrophoneTrack);
+      }
+      setSpeakerOn((prev) => !prev);
+    }
+  };
 
   return (
-    <div className="flex flex-col items-center">
-      <h2 className="text-xl font-bold mb-4">Agora Video Call</h2>
-      <div className="grid grid-cols-2 gap-4">
-        {localCameraTrack && (
-          <video
-            autoPlay
-            playsInline
-            ref={(element) => {
-              if (element) localCameraTrack.play(element);
-            }}
-            className="border-2 border-blue-500 w-64 h-48"
+    <div className="flex flex-col justify-between w-full h-screen p-1">
+      <div
+        className="grid gap-1 flex-1"
+        style={{
+          gridTemplateColumns:
+            remoteUsers.length > 9
+              ? "repeat(4, minmax(0, 1fr))"
+              : remoteUsers.length > 4
+              ? "repeat(3, minmax(0, 1fr))"
+              : remoteUsers.length > 1
+              ? "repeat(2, minmax(0, 1fr))"
+              : "minmax(0, 1fr)",
+        }}
+      >
+        {cameraOn && localCameraTrack && (
+          <LocalVideoTrack
+            track={localCameraTrack}
+            play={true}
+            className="w-full h-full"
           />
         )}
-        {remoteUsers.map((user) => (
-          <video
-            key={user.uid}
-            autoPlay
-            ref={(element) => {
-              if (element) user.videoTrack?.play(element);
-            }}
-            className="border-2 border-red-500 w-64 h-48"
-          />
+        {remoteUsers.map((user, index) => (
+          <RemoteUser user={user} key={index} />
         ))}
       </div>
-      <button>Start Quiz!</button>
-      <a href="/" className="mt-4 px-4 py-2 bg-red-500 text-white rounded">
-        End Call
-      </a>
+
+      {/* Controls */}
+      <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-4">
+        <button
+          onClick={toggleCamera}
+          className={`px-5 py-3 text-white rounded-lg w-40 ${
+            cameraOn
+              ? "bg-gray-600 hover:bg-gray-700"
+              : "bg-gray-400 hover:bg-gray-500"
+          }`}
+        >
+          {cameraOn ? "Turn Off Camera" : "Turn On Camera"}
+        </button>
+
+        <a
+          className="px-5 py-3 text-white bg-red-400 rounded-lg hover:bg-red-500 w-40 text-center"
+          href="/"
+        >
+          End Call
+        </a>
+
+        <button
+          onClick={toggleSpeaker}
+          className={`px-5 py-3 text-white rounded-lg w-40 ${
+            speakerOn
+              ? "bg-gray-600 hover:bg-gray-700"
+              : "bg-gray-400 hover:bg-gray-500"
+          }`}
+        >
+          {speakerOn ? "Mute Speaker" : "Unmute Speaker"}
+        </button>
+      </div>
     </div>
   );
-};
-
-// ✅ Wrap `CallComponent` in `AgoraRTCProvider`
-const Call = ({
-  appId,
-  channelName,
-}: {
-  appId: string;
-  channelName: string;
-}) => {
-  const client = AgoraRTC.createClient({ codec: "vp8", mode: "rtc" });
-
-  return (
-    <AgoraRTCProvider client={client}>
-      <CallComponent appId={appId} channelName={channelName} />
-    </AgoraRTCProvider>
-  );
-};
+}
 
 export default Call;

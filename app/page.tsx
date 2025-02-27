@@ -1,5 +1,4 @@
-"use client"; // Ensure it's a Client Component
-
+"use client";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
