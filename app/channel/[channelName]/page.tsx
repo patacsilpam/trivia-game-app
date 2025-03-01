@@ -4,7 +4,7 @@ import ClientCallWrapper from "./ClientWrapper";
 export default function Page({
   params,
 }: {
-  params: { channelName: string };
+  params: { channelName: any };
 }) {
   try {
     // Extract the channelName directly from params
