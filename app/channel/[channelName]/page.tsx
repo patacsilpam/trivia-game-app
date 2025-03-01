@@ -1,11 +1,13 @@
 // app/channel/[channelName]/page.tsx
 import ClientCallWrapper from "./ClientWrapper";
 
-export default function Page({
-  params,
-}: {
-  params: { channelName: string };
-}) {
+interface PageProps {
+  params: {
+    channelName: string;
+  };
+}
+
+export default function Page({ params }: PageProps) {
   try {
     // Extract the channelName directly from params
     const { channelName } = params;
