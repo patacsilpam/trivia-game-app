@@ -1,3 +1,4 @@
+// components/Call.tsx
 "use client";
 
 import { useState } from "react";
@@ -16,125 +17,131 @@ import AgoraRTC, {
 
 function Call(props: { appId: string; channelName: string }) {
   const client = useRTCClient(
-    typeof window !== "undefined"
-      ? AgoraRTC.createClient({ codec: "vp8", mode: "rtc" })
-      : null
+    AgoraRTC.createClient({ codec: "vp8", mode: "rtc" })
   );
 
   return (
     <AgoraRTCProvider client={client}>
-      <Videos
-        client={client}
-        channelName={props.channelName}
-        AppID={props.appId}
-      />
+      <Videos channelName={props.channelName} AppID={props.appId} />
     </AgoraRTCProvider>
   );
 }
 
-function Videos(props: { client: any; channelName: string; AppID: string }) {
-  const { client, AppID, channelName } = props;
+function Videos(props: { channelName: string; AppID: string }) {
+  const { AppID, channelName } = props;
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+
   const { isLoading: isLoadingMic, localMicrophoneTrack } =
     useLocalMicrophoneTrack();
   const { isLoading: isLoadingCam, localCameraTrack } = useLocalCameraTrack();
   const remoteUsers = useRemoteUsers();
   const { audioTracks } = useRemoteAudioTracks(remoteUsers);
-  const [cameraOn, setCameraOn] = useState(true);
-  const [speakerOn, setSpeakerOn] = useState(true);
 
-  usePublish([localMicrophoneTrack, localCameraTrack]);
+  // Only publish tracks that are enabled
+  const tracksToPublish = [
+    micEnabled ? localMicrophoneTrack : null,
+    cameraEnabled ? localCameraTrack : null,
+  ].filter(Boolean);
+
+  usePublish(tracksToPublish);
+
   useJoin({
     appid: AppID,
     channel: channelName,
     token: null,
   });
 
-  audioTracks.forEach((track) => track.play());
+  // Play remote audio tracks
+  audioTracks.map((track) => track.play());
 
-  if (isLoadingMic || isLoadingCam)
+  const deviceLoading = isLoadingMic || isLoadingCam;
+  if (deviceLoading)
     return (
       <div className="flex flex-col items-center pt-40">Loading devices...</div>
     );
 
-  // ✅ Toggle Camera Function (with valid check)
-  const toggleCamera = () => {
-    if (localCameraTrack) {
-      localCameraTrack.setEnabled(!cameraOn);
-      setCameraOn((prev) => !prev);
-    }
-  };
-
-  // ✅ Toggle Speaker Function (corrected)
-  const toggleSpeaker = async () => {
+  // Toggle microphone
+  const toggleMic = () => {
     if (localMicrophoneTrack) {
-      if (speakerOn) {
-        await client.unpublish(localMicrophoneTrack);
+      if (micEnabled) {
         localMicrophoneTrack.setEnabled(false);
       } else {
         localMicrophoneTrack.setEnabled(true);
-        await client.publish(localMicrophoneTrack);
       }
-      setSpeakerOn((prev) => !prev);
+      setMicEnabled(!micEnabled);
     }
   };
+
+  // Toggle camera
+  const toggleCamera = () => {
+    if (localCameraTrack) {
+      if (cameraEnabled) {
+        localCameraTrack.setEnabled(false);
+      } else {
+        localCameraTrack.setEnabled(true);
+      }
+      setCameraEnabled(!cameraEnabled);
+    }
+  };
+
+  const unit = "minmax(0, 1fr) ";
 
   return (
     <div className="flex flex-col justify-between w-full h-screen p-1">
       <div
-        className="grid gap-1 flex-1"
+        className={`grid gap-1 flex-1`}
         style={{
           gridTemplateColumns:
             remoteUsers.length > 9
-              ? "repeat(4, minmax(0, 1fr))"
+              ? unit.repeat(4)
               : remoteUsers.length > 4
-              ? "repeat(3, minmax(0, 1fr))"
+              ? unit.repeat(3)
               : remoteUsers.length > 1
-              ? "repeat(2, minmax(0, 1fr))"
-              : "minmax(0, 1fr)",
+              ? unit.repeat(2)
+              : unit,
         }}
       >
-        {cameraOn && localCameraTrack && (
-          <LocalVideoTrack
-            track={localCameraTrack}
-            play={true}
-            className="w-full h-full"
-          />
-        )}
+        <LocalVideoTrack
+          track={localCameraTrack}
+          play={cameraEnabled}
+          className="w-full h-full"
+        />
         {remoteUsers.map((user, index) => (
           <RemoteUser user={user} key={index} />
         ))}
       </div>
 
       {/* Controls */}
-      <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-4">
+      <div className="fixed z-10 bottom-0 left-0 right-0 flex justify-center gap-4 pb-4">
         <button
-          onClick={toggleCamera}
-          className={`px-5 py-3 text-white rounded-lg w-40 ${
-            cameraOn
-              ? "bg-gray-600 hover:bg-gray-700"
+          onClick={toggleMic}
+          className={`px-5 py-3 text-base font-medium text-center text-white rounded-lg focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900 w-40 ${
+            micEnabled
+              ? "bg-blue-400 hover:bg-blue-500"
               : "bg-gray-400 hover:bg-gray-500"
           }`}
         >
-          {cameraOn ? "Turn Off Camera" : "Turn On Camera"}
+          {micEnabled ? "Mute Mic" : "Unmute Mic"}
+        </button>
+
+        <button
+          onClick={toggleCamera}
+          className={`px-5 py-3 text-base font-medium text-center text-white rounded-lg focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900 w-40 ${
+            cameraEnabled
+              ? "bg-blue-400 hover:bg-blue-500"
+              : "bg-gray-400 hover:bg-gray-500"
+          }`}
+        >
+          {cameraEnabled ? "Turn Off Camera" : "Turn On Camera"}
         </button>
 
         <a
-          className="px-5 py-3 text-white bg-red-400 rounded-lg hover:bg-red-500 w-40 text-center"
-          href="/"
+          className="px-5 py-3 text-base font-medium text-center text-white bg-red-400 rounded-lg hover:bg-red-500 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900 w-40"
+          onClick={() => (window.location.href = "/")}
         >
           End Call
         </a>
-
-        <button
-          onClick={toggleSpeaker}
-          className={`px-5 py-3 text-white rounded-lg w-40 ${
-            speakerOn
-              ? "bg-gray-600 hover:bg-gray-700"
-              : "bg-gray-400 hover:bg-gray-500"
-          }`}
-        >
-          {speakerOn ? "Mute Speaker" : "Unmute Speaker"}
-        </button>
       </div>
     </div>
   );
