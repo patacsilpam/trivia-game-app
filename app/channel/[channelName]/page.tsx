@@ -1,22 +1,22 @@
 // app/channel/[channelName]/page.tsx
 import ClientCallWrapper from "./ClientWrapper";
-
-export default async function Page({
+import { use } from "react";
+export default function Page({
   params,
 }: {
-  params: { channelName: string };
+  params: Promise<{ channelName: string }>;
 }) {
   // Extract the channelName first
-  const { channelName } = params;
+  const resolvedParams = use(params);
 
   return (
     <main className="flex w-full flex-col">
       <p className="absolute z-10 mt-2 ml-12 text-2xl font-bold text-gray-900">
-        {channelName}
+        {resolvedParams.channelName}
       </p>
       <ClientCallWrapper
         appId={process.env.NEXT_PUBLIC_AGORA_APP_ID!}
-        channelName={channelName}
+        channelName={resolvedParams.channelName}
       />
     </main>
   );
