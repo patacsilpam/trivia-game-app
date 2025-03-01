@@ -1,5 +1,5 @@
 
-// app/channel/[channelName]/page.tsximport ClientCallWrapper from "./ClientWrapper";
+import ClientCallWrapper from "./ClientWrapper";
 
 export default async function Page({
   params,
