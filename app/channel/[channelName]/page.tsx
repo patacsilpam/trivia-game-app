@@ -1,14 +1,14 @@
-
+// app/channel/[channelName]/page.tsx
 import ClientCallWrapper from "./ClientWrapper";
 
-export default async function Page({
+export default function Page({
   params,
 }: {
   params: { channelName: string };
 }) {
   try {
-    // Extract the channelName first
-    const { channelName } = await params;
+    // Extract the channelName directly from params
+    const { channelName } = params;
 
     return (
       <main className="flex w-full flex-col">
